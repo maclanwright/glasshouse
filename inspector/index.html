@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Windows UI Inspector</title>
+<style>
+  :root {
+    --bg: #161618; --panel: #1f1f22; --line: #2e2e33; --text: #f2f2f4; --dim: #a1a1aa;
+    --accent: #ffffff; --accent-soft: rgba(255,255,255,.14); --pick: #0a84ff; --pick-soft: rgba(10,132,255,.22);
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.4 "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif; }
+  header { position: sticky; top: 0; z-index: 10; display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+           padding: 10px 16px; background: rgba(22,22,24,.92); backdrop-filter: blur(12px); border-bottom: 1px solid var(--line); }
+  h1 { font-size: 15px; font-weight: 600; margin: 0 10px 0 0; }
+  .tab { font: inherit; color: var(--dim); background: transparent; border: 1px solid transparent; border-radius: 8px; padding: 6px 12px; cursor: pointer; }
+  .tab:hover { color: var(--text); background: var(--panel); }
+  .tab.on { color: var(--text); background: var(--panel); border-color: var(--line); }
+  .tools { margin-left: auto; display: flex; gap: 6px; align-items: center; }
+  .small { font: inherit; font-size: 13px; color: var(--dim); background: transparent; border: 1px solid var(--line); border-radius: 8px; padding: 5px 10px; cursor: pointer; }
+  .small:hover { color: var(--text); }
+  .small.on { color: var(--text); border-color: var(--accent); }
+  #status { color: var(--dim); font-size: 13px; padding: 8px 16px 0; }
+  main { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 16px; padding: 12px 16px 16px; }
+  @media (max-width: 900px) { main { grid-template-columns: 1fr; } }
+  #stage { position: relative; align-self: start; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: #0d0d0f; }
+  #stage img { display: block; width: 100%; height: auto; }
+  #stage.empty { min-height: 300px; display: grid; place-items: center; color: var(--dim); padding: 24px; text-align: center; }
+  .part { position: absolute; border: 1px solid rgba(255,255,255,.2); border-radius: 3px; cursor: pointer; }
+  body.no-outlines .part { border-color: transparent; }
+  .part:hover { border: 2px solid var(--accent); background: var(--accent-soft); }
+  .part.picked { border: 2px solid var(--pick); background: var(--pick-soft); }
+  #tip { position: fixed; pointer-events: none; z-index: 20; background: #000d; border: 1px solid var(--line); border-radius: 6px;
+         padding: 4px 8px; font-size: 12px; display: none; max-width: 440px; }
+  aside { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px; align-self: start; position: sticky; top: 64px; }
+  aside h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--dim); margin: 0 0 10px; font-weight: 600; }
+  dl { margin: 0; display: grid; grid-template-columns: 64px 1fr; gap: 6px 10px; }
+  dt { color: var(--dim); } dd { margin: 0; word-break: break-word; }
+  .path { margin-top: 12px; font-size: 12px; color: var(--dim); word-break: break-word; }
+  .hint { color: var(--dim); font-size: 13px; margin: 0; }
+  .err { color: #ff6961; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Windows UI Inspector</h1>
+  <nav id="tabs"></nav>
+  <div class="tools">
+    <button class="small on" id="outlines" title="Show or hide the outlines">Outlines</button>
+    <button class="small" id="retake" title="Take this view again">Retake</button>
+  </div>
+</header>
+<div id="status">Loading…</div>
+<main>
+  <div id="stage" class="empty">Claude is taking the pictures. They appear here by themselves.</div>
+  <aside>
+    <h2>Picked part</h2>
+    <div id="picked"><p class="hint">Click a part in the picture (or use the select tool), then tell Claude how it should look.</p></div>
+  </aside>
+</main>
+<div id="tip"></div>
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const label = p => (p.cls || p.type) + (p.aid ? '#' + p.aid : '') + (p.name ? ' "' + p.name + '"' : '');
+let caps = [], active = null, current = null, lastStamps = '';
+
+function tabs() {
+  $('#tabs').innerHTML = '';
+  caps.forEach(c => {
+    const b = document.createElement('button');
+    b.className = 'tab' + (c.surface === active ? ' on' : '');
+    b.textContent = c.title;
+    b.addEventListener('click', () => { active = c.surface; tabs(); render(c); });
+    $('#tabs').appendChild(b);
+  });
+}
+
+function render(cap) {
+  current = cap;
+  const stage = $('#stage');
+  stage.className = ''; stage.innerHTML = '';
+  const img = new Image();
+  img.src = '/shots/' + cap.image;
+  img.alt = cap.title + ' screenshot';
+  stage.appendChild(img);
+  // biggest first, so smaller parts sit on top and stay clickable
+  [...cap.parts].sort((a, b) => b.w * b.h - a.w * a.h).forEach(p => {
+    const d = document.createElement('div');
+    d.className = 'part';
+    Object.assign(d.style, { left: p.x / cap.width * 100 + '%', top: p.y / cap.height * 100 + '%',
+                             width: p.w / cap.width * 100 + '%', height: p.h / cap.height * 100 + '%' });
+    d.dataset.part = (p.cls || p.type) + (p.aid ? '#' + p.aid : '');
+    d.dataset.type = p.type; d.dataset.name = p.name || '';
+    d.setAttribute('aria-label', label(p));
+    d.addEventListener('mousemove', e => { const t = $('#tip'); t.textContent = label(p); t.style.display = 'block';
+      t.style.left = e.clientX + 14 + 'px'; t.style.top = e.clientY + 14 + 'px'; });
+    d.addEventListener('mouseleave', () => $('#tip').style.display = 'none');
+    d.addEventListener('click', e => { e.stopPropagation(); pick(p, d); });
+    stage.appendChild(d);
+  });
+  $('#status').textContent = `${cap.title}: ${cap.parts.length} parts. Taken ${cap.time.replace('T', ' ')}. Hover to see a part's name, click to pick it.`;
+}
+
+function chain(p) {
+  const byId = Object.fromEntries(current.parts.map(x => [x.id, x]));
+  const out = []; let q = byId[p.parent];
+  while (q) { out.unshift((q.cls || q.type) + (q.aid ? '#' + q.aid : '')); q = byId[q.parent]; }
+  return out.join(' > ');
+}
+
+function pick(p, el) {
+  document.querySelectorAll('.part.picked').forEach(x => x.classList.remove('picked'));
+  el.classList.add('picked');
+  const path = chain(p);
+  $('#picked').innerHTML = `<dl>
+    <dt>View</dt><dd>${esc(current.title)}</dd>
+    <dt>Type</dt><dd>${esc(p.type || '-')}</dd><dt>Class</dt><dd>${esc(p.cls || '-')}</dd>
+    <dt>Name</dt><dd>${esc(p.name || '-')}</dd><dt>Id</dt><dd>${esc(p.aid || '-')}</dd>
+    <dt>Size</dt><dd>${p.w} x ${p.h} px</dd></dl>
+    <div class="path">Inside: ${esc(path || '(top)')}</div>
+    <p class="hint" style="margin-top:12px">Saved for Claude. Now say what to change.</p>`;
+  fetch('/select', { method: 'POST', body: JSON.stringify({ surface: current.surface, view: current.title, part: p, path }) });
+}
+
+async function load() {
+  try {
+    caps = await (await fetch('/captures')).json();
+    const stamps = caps.map(c => c.surface + c.stamp).join();
+    if (stamps === lastStamps) return;
+    lastStamps = stamps;
+    if (!caps.length) { $('#status').textContent = 'No pictures yet.'; return; }
+    if (!caps.find(c => c.surface === active)) active = caps[0].surface;
+    tabs(); render(caps.find(c => c.surface === active));
+  } catch (e) { $('#status').innerHTML = '<span class="err">Inspector not reachable.</span>'; }
+}
+
+$('#outlines').addEventListener('click', e => { document.body.classList.toggle('no-outlines'); e.target.classList.toggle('on'); });
+$('#retake').addEventListener('click', async () => {
+  if (!current) return;
+  $('#status').textContent = 'Taking ' + current.title + ' again… (it flashes open for a moment)';
+  const r = await fetch('/capture', { method: 'POST', body: JSON.stringify({ surface: current.surface, query: current.query }) });
+  if (!r.ok) { const j = await r.json().catch(() => ({})); $('#status').innerHTML = '<span class="err">Could not retake it: ' + esc(j.error || r.status) + '</span>'; return; }
+  lastStamps = ''; load();
+});
+load(); setInterval(load, 4000);
+</script>
+</body>
+</html>
