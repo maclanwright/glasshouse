@@ -132,7 +132,7 @@ namespace Glasshouse
         {
             var d = new ModDiff { Id = want.Id };
             if (have == null) { d.New = true; return d; }
-            d.Reinstall = have.Spec.Version != want.Version || !have.LibraryPresent;
+            d.Reinstall = have.Spec.Version != want.Version || !have.LibraryPresent || ModFixes.Missing(want, have.LibraryFileName);
             d.LoadChange = have.Spec.Include != want.Include || have.Spec.Exclude != want.Exclude || have.Spec.Architecture != want.Architecture;
             d.DisabledChange = have.Spec.Disabled != want.Disabled;
             foreach (var kv in want.Settings)
@@ -237,6 +237,9 @@ namespace Glasshouse
         public static string DownloadAndPlace(string id, string version, string modsDir = null, string sourceDir = null)
         {
             modsDir = modsDir ?? EngineModsDir; sourceDir = sourceDir ?? Path.Combine(DataDir, "ModsSource");
+            // a bug the author's build still has: our fixed build of the same version (see ModFixes)
+            var fix = ModFixes.For(id, version);
+            if (fix != null && ModFixes.Place(fix, modsDir, sourceDir) is string fixedLib) return fixedLib;
             string rand = new Random().Next(100000, 999999).ToString();
             string lib = $"{id}_{version}_{rand}.dll";
             var folders = RuntimeInformation.OSArchitecture == Architecture.Arm64

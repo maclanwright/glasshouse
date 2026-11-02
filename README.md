@@ -94,13 +94,21 @@ Themes from the Windhawk styling guides are stored as a link to their page and r
 
 ## How it works
 
-Most of the look comes from [Windhawk](https://windhawk.net) mods. Glasshouse installs Windhawk with winget, downloads each mod's published build from windhawk.net, and writes its settings, the same way Windhawk's own window would. Apps come from winget or the Microsoft Store.
+Most of the look comes from [Windhawk](https://windhawk.net) mods. Glasshouse installs Windhawk with winget, downloads each mod's published build from windhawk.net (or a fixed build, see [Fixes to mods](#fixes-to-mods)), and writes its settings, the same way Windhawk's own window would. Apps come from winget or the Microsoft Store.
 
 A few safety rules are built in:
 
 - The window glass only loads into Windows' own programs: never into apps you install, Glasshouse itself, Windows' background services, or network services such as VPNs (Tailscale), where it can cause crashes or garbled text.
 - If the glass mod ever has to reload while such a service is running with it loaded, Glasshouse stops the service, makes the change and starts it again.
 - New mods are written switched off and turned on only once their settings are in place.
+
+## Fixes to mods
+
+When a mod has a bug its author hasn't fixed yet, Glasshouse installs a fixed build of the same version instead: the author's code with a small change, built with Windhawk's own compiler and published on the [mod-fixes release](https://github.com/maclanwright/glasshouse/releases/tag/mod-fixes). Each download is checked against its hash before it's installed, and Repair puts the fixed build back if the author's one is installed. The changes are in [`fixes`](fixes) and keep the mod's own licence (GPL-3.0). Windhawk still offers the author's updates as usual.
+
+| Mod | Version | What the fix does |
+|---|---|---|
+| Mac Island & Dock | 2.0.1 | Bluetooth list: a device you click no longer stays on "Connecting..." for good (which also blocked every other click in the list), and Disconnect disconnects headphones fully, music and calls, like Windows' own button. |
 
 ## Uninstalling
 

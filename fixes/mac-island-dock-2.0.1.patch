@@ -1,0 +1,142 @@
+Mac Island & Dock 2.0.1 (by caliberda, GPL-3.0): Bluetooth list fixes, published by Glasshouse as "fix3".
+Applies to https://mods.windhawk.net/mods/mac-island-dock/2.0.1.wh.cpp (sha256 9434ec71...82d95).
+
+1. A device clicked in the Bluetooth list stayed on "Connecting..." or "Disconnecting..." for good, and every
+   other click in the list was ignored: a panel's timers go off once (Panel::HandleMessage kills them first),
+   and CheckBluetoothStep never set its timer again, so the device was only looked at after 0.3 s.
+2. Disconnect left headphones connected: only the first audio filter holding the device's address was asked.
+   Headphones have two (music and headset), and with Intel's Bluetooth audio offload the headset's filter
+   doesn't hold the address at all. Now every filter of the device is asked, also those found by the
+   device's container ID.
+
+Built with Windhawk's own compiler (clang++ -std=c++23 -O2, the mod's @compilerOptions), 64- and 32-bit.
+
+--- a/mac-island-dock.wh.cpp
++++ b/mac-island-dock.wh.cpp
+@@ -18676,8 +18676,21 @@
+                                                  ULONG* returned) = 0;
+ };
+ 
++// The device an audio endpoint belongs to (PKEY_Device_ContainerId): the
++// same for all of a Bluetooth device's endpoints.
++constexpr PROPERTYKEY kPKEY_Device_ContainerId = {
++    {0x8c7ed206,
++     0x3f8a,
++     0x4827,
++     {0xb3, 0xab, 0xae, 0x9e, 0x1f, 0xae, 0xfc, 0x6c}},
++    2};
++
+ // False without an audio endpoint of the device, or when its driver
+-// refused.
++// refused. A disconnect goes to every filter of the device (music and
++// headset, like Windows' own "Disconnect"): one left connected keeps the
++// device connected. The headset's filter doesn't always hold the address
++// (Intel's Bluetooth audio offload, on Surfaces and others): it's found by
++// the device its endpoint belongs to, like the music one's.
+ bool SetBluetoothAudioConnected(ULONGLONG address, bool connect) {
+     winrt::com_ptr<IMMDeviceEnumerator> devices;
+     winrt::com_ptr<IMMDeviceCollection> endpoints;
+@@ -18694,6 +18707,14 @@
+     // (The address in the filter's ID: "...&0&001A7DDA7113_C00000000#...".)
+     WCHAR wanted[16];
+     swprintf_s(wanted, L"%012llX", address & 0xFFFFFFFFFFFFull);
++    struct Filter {
++        std::wstring id;
++        GUID container;
++        bool hasAddress;
++    };
++    std::vector<Filter> filters;
++    GUID container{};
++    bool hasContainer = false;
+     for (UINT i = 0; i < count; i++) {
+         winrt::com_ptr<IMMDevice> endpoint;
+         winrt::com_ptr<IDeviceTopology> topology;
+@@ -18706,17 +18727,49 @@
+             FAILED(connector->GetDeviceIdConnectedTo(&filterId))) {
+             continue;
+         }
+-        std::wstring id = filterId;
+-        std::transform(id.begin(), id.end(), id.begin(), towupper);
+-        winrt::com_ptr<IMMDevice> filter;
+-        winrt::com_ptr<IKsControlProperty> control;
+-        const bool found =
+-            id.find(wanted) != std::wstring::npos &&
+-            SUCCEEDED(devices->GetDevice(filterId, filter.put())) &&
+-            SUCCEEDED(filter->Activate(kIID_IKsControl, CLSCTX_ALL, nullptr,
+-                                       control.put_void()));
++        Filter filter{filterId, {}, false};
+         CoTaskMemFree(filterId);
+-        if (!found) {
++        std::wstring upper = filter.id;
++        std::transform(upper.begin(), upper.end(), upper.begin(), towupper);
++        filter.hasAddress = upper.find(wanted) != std::wstring::npos;
++        winrt::com_ptr<IPropertyStore> properties;
++        if (SUCCEEDED(endpoint->OpenPropertyStore(STGM_READ,
++                                                  properties.put()))) {
++            PROPVARIANT value;
++            PropVariantInit(&value);
++            if (SUCCEEDED(properties->GetValue(kPKEY_Device_ContainerId,
++                                               &value)) &&
++                value.vt == VT_CLSID && value.puuid) {
++                filter.container = *value.puuid;
++                if (filter.hasAddress && !hasContainer) {
++                    container = filter.container;
++                    hasContainer = true;
++                }
++            }
++            PropVariantClear(&value);
++        }
++        filters.push_back(std::move(filter));
++    }
++    // (The ones with the address first: a connect stops at the first.)
++    std::stable_partition(filters.begin(), filters.end(),
++                          [](const Filter& filter) { return filter.hasAddress; });
++    bool done = false;
++    // (A filter's speaker and microphone endpoints: asked once.)
++    std::vector<std::wstring> asked;
++    for (const Filter& filter : filters) {
++        if (!filter.hasAddress &&
++            !(hasContainer && IsEqualGUID(filter.container, container))) {
++            continue;
++        }
++        if (std::find(asked.begin(), asked.end(), filter.id) != asked.end()) {
++            continue;
++        }
++        asked.push_back(filter.id);
++        winrt::com_ptr<IMMDevice> device;
++        winrt::com_ptr<IKsControlProperty> control;
++        if (FAILED(devices->GetDevice(filter.id.c_str(), device.put())) ||
++            FAILED(device->Activate(kIID_IKsControl, CLSCTX_ALL, nullptr,
++                                    control.put_void()))) {
+             continue;
+         }
+         KsPropertyRequest property{kKsPropSetBtAudio,
+@@ -18726,10 +18779,13 @@
+         ULONG returned = 0;
+         if (SUCCEEDED(control->KsProperty(&property, sizeof(property),
+                                           nullptr, 0, &returned))) {
+-            return true;
++            done = true;
++            if (connect) {
++                break;
++            }
+         }
+     }
+-    return false;
++    return done;
+ }
+ 
+ struct BluetoothConnectRequest {
+@@ -37016,8 +37072,10 @@
+         default:
+             break;
+     }
+-    if (m_bluetoothStep == BluetoothStep::None) {
+-        KillTimer(m_hwnd, kBluetoothTimerId);
++    // (A panel's timer goes off once, see HandleMessage: set again until
++    // it's done, or the row stayed on "Connecting..." for good.)
++    if (m_bluetoothStep != BluetoothStep::None) {
++        SetTimer(m_hwnd, kBluetoothTimerId, kBluetoothCheckMs, nullptr);
+     }
+ }
+ 
