@@ -290,9 +290,14 @@
       "disabled": false,
       "settings": {
         "@import": "https://raw.githubusercontent.com/ramensoftware/windows-11-settings-styling-guide/main/Themes/Translucent%20Seamless/README.md",
+        "@replace": "FallbackColor=\"#00000000\" TintColor=\"#252525\" TintLuminosityOpacity=\"0.6\" TintOpacity=\"0.5\" => FallbackColor=\"#F02B2B2D\" TintColor=\"#2B2B2D\" TintLuminosityOpacity=\"0.95\" TintOpacity=\"0.95\" || FallbackColor=\"#00000000\" => FallbackColor=\"#F0202022\" || TintLuminosityOpacity=\"0.45\" TintOpacity=\"0.4\" => TintLuminosityOpacity=\"0.9\" TintOpacity=\"0.85\"",
         "theme": "",
         "controlStyles[0].target": "SystemSettings.View.RootPage",
-        "controlStyles[0].styles[0]": "RequestedTheme=2"
+        "controlStyles[0].styles[0]": "RequestedTheme=2",
+        "controlStyles[1].target": "Microsoft.ReactNative.ReactRootView > Microsoft.ReactNative.ViewPanel > Microsoft.ReactNative.ViewPanel > Microsoft.ReactNative.ViewPanel > Microsoft.ReactNative.ViewPanel > Border",
+        "controlStyles[1].styles[0]": "Background=#1AFFFFFF",
+        "controlStyles[2].target": "Microsoft.ReactNative.ViewPanel > TextBlock",
+        "controlStyles[2].styles[0]": "Foreground=#D6D6D8"
       }
     },
     {

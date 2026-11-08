@@ -15,6 +15,9 @@ namespace Glasshouse
     public static class ThemeImport
     {
         public const string Key = "@import";
+        // Optional tweaks to the imported theme's own values: "find => replace", several joined with " || ".
+        // Lets a look fix one detail of a theme without carrying a copy of it.
+        public const string ReplaceKey = "@replace";
         static readonly string[] Arrays = { "styleConstants", "themeResourceVariables", "controlStyles" };
 
         public static bool Has(ModSpec m) => m.Settings.ContainsKey(Key);
@@ -24,7 +27,8 @@ namespace Glasshouse
         {
             if (!(m.Settings.TryGetValue(Key, out var u) && u is string url)) return;
             var theme = Parse(Fetch(url));
-            var own = m.Settings.Where(kv => kv.Key != Key).ToDictionary(kv => kv.Key, kv => kv.Value);
+            if (m.Settings.TryGetValue(ReplaceKey, out var r) && r is string rules) ApplyReplace(theme, rules);
+            var own = m.Settings.Where(kv => kv.Key != Key && kv.Key != ReplaceKey).ToDictionary(kv => kv.Key, kv => kv.Value);
             var merged = new Dictionary<string, object>(theme);
             foreach (var kv in own)
             {
@@ -39,6 +43,18 @@ namespace Glasshouse
             m.Settings.Clear();
             foreach (var kv in merged) m.Settings[kv.Key] = kv.Value;
             Log.Info($"  {m.Id}: theme read from {url} ({theme.Count} settings)");
+        }
+
+        static void ApplyReplace(Dictionary<string, object> theme, string rules)
+        {
+            foreach (var rule in rules.Split(new[] { " || " }, StringSplitOptions.RemoveEmptyEntries))
+            {
+                int at = rule.IndexOf(" => ", StringComparison.Ordinal);
+                if (at < 0) { Log.Warn("@replace rule without ' => ': " + rule); continue; }
+                string find = rule.Substring(0, at), with = rule.Substring(at + 4);
+                foreach (var k in theme.Keys.ToList())
+                    if (theme[k] is string s && s.Contains(find)) theme[k] = s.Replace(find, with);
+            }
         }
 
         static bool IsEmptyItem(Dictionary<string, object> s, string arr, int i) =>
