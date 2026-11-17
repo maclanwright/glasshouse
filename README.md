@@ -27,6 +27,7 @@ Getting this look by hand means installing half a dozen tools, finding the right
 - **Frosted glass** on Windows' own windows (File Explorer, Task Manager, Control Panel and the rest). Apps you install keep their own design.
 - **Themes** for Start, search, File Explorer, Settings and the notification panels
 - **Light by day, dark at night**, following the sun where you are, with a dynamic wallpaper that changes through the day
+- **Your apps switch with it**: browsers, Office, VS Code and other apps with their own light and dark are set to follow Windows, so nothing stays dark by day (white-on-white menus and text boxes) or bright at night
 - **macOS-style pointers**
 - **Spotlight-style search** (Raycast, Alt+Space), **Quick Look** and window tools (PowerToys), and **file conversion** from the right-click menu (File Converter)
 
@@ -67,12 +68,23 @@ Everything is optional. The installer lets you untick any part.
 
 Glasshouse opens as a small settings window, laid out like macOS System Settings:
 
-- **Appearance**: accent colour, light and dark times, wallpaper
+- **Appearance**: accent colour, light and dark times, wallpaper, and **Apps that switch with it** (below)
 - **Dock**, **Menu bar**, **Window previews**, **Glass and hover**: sizes, blur and tint, with changes shown live
-- **Pointers and apps**: pointers, desktop tidy-ups, Task Manager kept dark
+- **Pointers and apps**: pointers, desktop tidy-ups, Task Manager kept dark, and Windows' standard colours for web pages and older programs (the glass can leave Windows' old colours dark, which turns typed text in browsers white on white)
 - **Look files**: save your whole setup to one file, or open someone else's
 - **Repair**: puts everything back the way your look says, if a Windows update or another app changes something
 - **Inspector**: takes a picture of a part of Windows with every piece outlined and named, for anyone who wants to restyle it further
+
+## Apps that switch with it
+
+Many apps have their own light and dark setting. One left on Dark doesn't move when Windows switches to light at sunrise, and it clashes: a browser kept on Dark by day draws its menus and typed text light over pages that paint white boxes, so they go white on white.
+
+Appearance > **Apps that switch with it** lists the apps you choose. Each one keeps its own light and dark; Glasshouse only sets it to follow Windows, so everything switches at the same moment.
+
+- **Automatic** (a switch): Glasshouse sets the app's own "follow Windows" option and keeps the old value, so turning the switch off puts it back. Brave and Chrome (every profile), Microsoft Office, VS Code and Cursor (your own dark or light theme stays yours), Windows Terminal and PowerToys. A browser rewrites its settings while it runs, so for Brave and Chrome the change lands the next time the browser quits (its menu > Exit; closing the window can leave it running in the background): a hidden copy of Glasshouse waits for that, then stops.
+- **One step** (a button): apps whose setting lives in your account or somewhere Glasshouse can't safely change it, such as Discord, WhatsApp, Edge, Telegram, Slack, Zoom, Figma, Bitwarden, Raycast and qBittorrent. The row says where to click, once, and opens the app.
+
+**+ Add an app...** shows the apps found on your computer. The built-in look turns this on for Brave and Chrome.
 
 ## Look files
 

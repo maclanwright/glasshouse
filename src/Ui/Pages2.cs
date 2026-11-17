@@ -114,7 +114,7 @@ namespace Glasshouse.Ui
             {
                 Child = new ScrollViewer { Content = content, VerticalScrollBarVisibility = ScrollBarVisibility.Auto }, Padding = new Thickness(24, 22, 24, 8),
                 CornerRadius = new CornerRadius(0, 0, 12, 12), BorderThickness = new Thickness(1, 0, 1, 1), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Top,
-                MaxHeight = ActualHeight - 60, Effect = new System.Windows.Media.Effects.DropShadowEffect { BlurRadius = 30, ShadowDepth = 8, Opacity = 0.45 }
+                MaxHeight = Math.Max(200, (ActualHeight > 0 ? ActualHeight : Height) - 60), Effect = new System.Windows.Media.Effects.DropShadowEffect { BlurRadius = 30, ShadowDepth = 8, Opacity = 0.45 }
             };
             b.SetResourceReference(Border.BackgroundProperty, "Win");
             b.SetResourceReference(Border.BorderBrushProperty, "Line");

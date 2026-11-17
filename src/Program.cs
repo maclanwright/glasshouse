@@ -132,10 +132,34 @@ namespace Glasshouse
                     var look = Repair.WantedLook(a.Value("--look"));
                     foreach (var c in Machine.Status(look)) Log.Info(c.ToString());
                 }
+                else if (a.Value("--follow-selftest") is string fdir) code = FollowAppsTest.Run(fdir);
+                else if (a.Has("--standard-colours")) { Shell.SetStandardColours(); Log.Info("standard colours: " + (Shell.ColoursStandard ? "in place" : "NOT in place")); }
+                else if (a.Has("--follow-apps")) FollowApps.Watch();   // hidden: waits for apps to close so they can follow Windows
+                else if (a.Has("--follow-status"))
+                {
+                    var look = Repair.WantedLook(a.Value("--look"));
+                    foreach (var app in FollowApps.All.Where(x => x.Installed))
+                        Log.Info($"{app.Id,-12} {(app.NoSetting ? "no setting" : app.Automatic ? (app.Follows ? "follows Windows" : "own setting") : "one step")}{(app.Running ? ", open" : "")}"
+                                 + (look != null && look.FollowApps.TryGetValue(app.Id, out var on) ? (on ? ", in the list (on)" : ", in the list (off)") : ""));
+                }
+                else if (a.Value("--follow") is string fl)
+                {
+                    // --follow brave=on,vscode=off,discord=remove: change this machine's list and put it in place
+                    var look = Repair.WantedLook() ?? throw new InvalidOperationException("nothing set up here yet");
+                    foreach (var kv in fl.Split(',').Select(x => x.Split('=')).Where(x => x.Length == 2))
+                    {
+                        if (FollowApps.Find(kv[0]) == null) throw new ArgumentException("unknown app: " + kv[0]);
+                        if (kv[1] == "remove") look.FollowApps.Remove(kv[0]); else look.FollowApps[kv[0]] = kv[1] == "on";
+                    }
+                    var waiting = FollowApps.Apply(look.FollowApps);
+                    Machine.SaveWanted(look, look.Accent, look.Personal);
+                    foreach (var l in FollowApps.Describe(look.FollowApps)) Log.Info(l);
+                    if (waiting.Count > 0) Log.Info("waiting for these to close: " + string.Join(", ", waiting));
+                }
                 else if (a.Value("--selftest") is string dir) SelfTest.Downloads(dir);
                 else if (a.Has("--knobtest")) SelfTest.Knobs();
                 else if (a.Value("--uitest") is string udir) code = Ui.UiTest.Run(udir);
-                else if (a.Value("--render") is string rdir) code = Ui.MainWindow.RenderAll(rdir, a.Has("--dark") ? true : a.Has("--light") ? (bool?)false : null);
+                else if (a.Value("--render") is string rdir) code = Ui.MainWindow.RenderAll(rdir, a.Has("--dark") ? true : a.Has("--light") ? (bool?)false : null, a.Has("--sample-apps"));
                 else if (a.Has("--inspector-server"))
                 {
                     Inspector.Server.RunForever();

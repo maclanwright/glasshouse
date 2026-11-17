@@ -26,7 +26,7 @@ namespace Glasshouse.Ui
         // Sidebar pages: name, Segoe Fluent icon, icon square colour, words that find it in the search box
         static readonly (string name, string icon, string color, string words)[] Pages =
         {
-            ("Appearance", "", "#5E5CE6", "accent colour color light dark sunset sunrise wallpaper catalina theme location"),
+            ("Appearance", "", "#5E5CE6", "accent colour color light dark sunset sunrise wallpaper catalina theme location apps browser brave chrome follow switch"),
             ("Dock", "", "#48484A", "dock size magnification hide auto-hide blur tint recycle bin divider taskbar"),
             ("Menu bar", "", "#0A84FF", "menu bar island pill clock calendar top"),
             ("Window previews", "", "#30B0C7", "previews thumbnails hover window size tint"),

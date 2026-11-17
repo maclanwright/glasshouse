@@ -33,6 +33,10 @@
     "quietSounds": true,
     "darkTaskManager": true
   },
+  "followApps": {
+    "brave": true,
+    "chrome": true
+  },
   "personal": [],
   "mods": [
     {

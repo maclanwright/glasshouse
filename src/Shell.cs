@@ -97,7 +97,8 @@ namespace Glasshouse
             StartNoRecent = GetDword(Adv, "Start_TrackDocs", 1) == 0,
             AccentTitleBars = GetDword(@"Software\Microsoft\Windows\DWM", "ColorPrevalence", 0) == 1,
             QuietSounds = (Registry.CurrentUser.OpenSubKey(@"AppEvents\Schemes")?.GetValue("") as string) == ".None",
-            DarkTaskManager = TaskManagerSettings().Long("AppTheme", 0) == 2
+            DarkTaskManager = TaskManagerSettings().Long("AppTheme", 0) == 2,
+            StandardColours = ColoursStandard
         };
 
         // Returns true when the taskbar needs a restart to show the change.
@@ -122,7 +123,46 @@ namespace Glasshouse
             if (SetDword(Adv, "TaskbarSmallIcons", 0) | SetDword(Adv, "MMTaskbarEnabled", 0)) restart = true;
             if (t.QuietSounds) QuietSounds();
             SetTaskManagerDark(t.DarkTaskManager);
+            if (t.StandardColours) SetStandardColours();
             return restart;
+        }
+
+        // ---------- Windows' old (classic) colours ----------
+        // The glass mod can leave these dark (Window black, WindowText near-white) even after its own colour option is
+        // off. Browsers in light mode take web pages' standard colours from them, so text boxes on white pages get
+        // near-white text (Google's admin pages), and older programs draw black lists. These are Windows' own defaults
+        // for the content colours; title bar, highlight and desktop colours follow the accent and aren't touched.
+        static readonly (string name, int index, string rgb)[] StandardColourSet =
+        {
+            ("Scrollbar", 0, "200 200 200"), ("Menu", 4, "240 240 240"), ("Window", 5, "255 255 255"), ("WindowFrame", 6, "100 100 100"),
+            ("MenuText", 7, "0 0 0"), ("WindowText", 8, "0 0 0"), ("ActiveBorder", 10, "180 180 180"), ("InactiveBorder", 11, "244 247 252"),
+            ("AppWorkspace", 12, "171 171 171"), ("ButtonFace", 15, "240 240 240"), ("ButtonShadow", 16, "160 160 160"), ("GrayText", 17, "109 109 109"),
+            ("ButtonText", 18, "0 0 0"), ("ButtonHilight", 20, "255 255 255"), ("ButtonDkShadow", 21, "105 105 105"), ("ButtonLight", 22, "227 227 227"),
+            ("InfoText", 23, "0 0 0"), ("InfoWindow", 24, "255 255 225"), ("MenuBar", 30, "240 240 240"),
+        };
+        const string ColoursKey = @"Control Panel\Colors";
+        [DllImport("user32.dll")] static extern bool SetSysColors(int count, int[] elements, int[] rgb);
+        [DllImport("user32.dll")] static extern uint GetSysColor(int index);
+
+        static int Rgb(string s) { var p = s.Split(' ').Select(int.Parse).ToArray(); return p[0] | (p[1] << 8) | (p[2] << 16); }
+        static string Saved(string name) { using (var k = Registry.CurrentUser.OpenSubKey(ColoursKey)) return (k?.GetValue(name) as string)?.Trim(); }
+
+        // Saved (what the next sign-in loads) and live (what programs use now) both standard.
+        public static bool ColoursStandard => StandardColourSet.All(c => Saved(c.name) == c.rgb && GetSysColor(c.index) == (uint)Rgb(c.rgb));
+
+        public static void SetStandardColours()
+        {
+            var saved = StandardColourSet.Where(c => Saved(c.name) != c.rgb).ToList();
+            if (saved.Count > 0)
+            {
+                Backup.Save(@"HKCU\" + ColoursKey);
+                using (var k = Registry.CurrentUser.CreateSubKey(ColoursKey))
+                    foreach (var c in saved) k.SetValue(c.name, c.rgb, RegistryValueKind.String);
+            }
+            var live = StandardColourSet.Where(c => GetSysColor(c.index) != (uint)Rgb(c.rgb)).ToList();
+            if (live.Count > 0) SetSysColors(live.Count, live.Select(c => c.index).ToArray(), live.Select(c => Rgb(c.rgb)).ToArray());
+            if (saved.Count + live.Count > 0)
+                Log.Info($"Windows' standard colours back for web pages and older programs ({string.Join(", ", saved.Select(c => c.name).Union(live.Select(c => c.name)))})");
         }
 
         // ---------- Task Manager's own app theme ----------

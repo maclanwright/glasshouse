@@ -48,6 +48,7 @@ namespace Glasshouse
             look.Apps["raycast"] = AppPaths.RaycastInstalled;
             look.Apps["powertoys"] = PowerToys.Installed;
             look.Apps["fileConverter"] = AppPaths.FileConverterInstalled;
+            look.FollowApps = FollowApps.Listed();
             foreach (var r in PersonalItem.Rules)
             {
                 var m = look.Mod(r.Value.mod);
@@ -125,6 +126,11 @@ namespace Glasshouse
             else if (!string.IsNullOrEmpty(accent)) AutoDarkMode.SetAccent(accent);   // keep Auto Dark Mode's copy in step
 
             Step("light and dark", o.LightDark && look.LightDark != null && look.LightDark.Enabled, () => AutoDarkMode.Apply(look.LightDark));
+            Step("apps that switch with it", o.LightDark, () =>
+            {
+                var waiting = FollowApps.Apply(look.FollowApps);
+                if (waiting.Count > 0) Log.Info("follows Windows the next time it quits (its menu > Exit): " + string.Join(", ", waiting));
+            });
             Step("wallpaper", o.Wallpaper, () => Glasshouse.Wallpaper.Apply(look.Wallpaper, look.LightDark));
             Step("pointers", o.Pointers, () => Glasshouse.Pointers.Apply(look.MacPointers));
             Step("Windows settings", o.Tidy, () => { if (Shell.ApplyTidy(look.Tidy)) res.NeedsTaskbarRestart = true; });
@@ -181,6 +187,17 @@ namespace Glasshouse
             }
             c.Add(new Check { Name = "Smart App Control", Ok = Sac.State != Sac.Mode.On, Detail = Sac.Describe() });
             c.Add(new Check { Name = "Auto Dark Mode", Ok = AutoDarkMode.Running, Detail = !AutoDarkMode.Installed ? "not installed" : AutoDarkMode.Running ? "running" : "installed, not running" });
+            if (want != null && want.Tidy.StandardColours)
+                c.Add(new Check { Name = "Windows' standard colours", Ok = Shell.ColoursStandard,
+                    Detail = Shell.ColoursStandard ? "in place (typed text in web pages stays readable)" : "dark leftovers from the glass: Repair puts the standard ones back" });
+            if (want != null && want.FollowApps.Count > 0)
+            {
+                var auto = want.FollowApps.Where(kv => kv.Value).Select(kv => FollowApps.Find(kv.Key)).Where(a => a != null && a.Automatic && a.Installed).ToList();
+                var notYet = auto.Where(a => !a.Follows).ToList();
+                c.Add(new Check { Name = "Apps that switch with it", Ok = notYet.Count == 0,
+                    Detail = notYet.Count == 0 ? (auto.Count == 0 ? "nothing for Glasshouse to set" : string.Join(", ", auto.Select(a => a.Name)) + " follow Windows")
+                        : string.Join("; ", notYet.Select(a => a.Name + (a.WaitsForClose && a.Running ? " follows Windows the next time it quits (its menu > Exit)" : " doesn't follow Windows: Repair sets it"))) });
+            }
             var theme = Wallpaper.CurrentTheme();
             c.Add(new Check { Name = "Wallpaper", Ok = Wallpaper.Installed && Shell.Running("WinDynamicDesktop") && !string.IsNullOrEmpty(theme),
                 Detail = !Wallpaper.Installed ? "WinDynamicDesktop not installed" : $"{theme ?? "no theme"}, {(Shell.Running("WinDynamicDesktop") ? "running" : "not running")}" });

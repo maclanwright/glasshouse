@@ -98,18 +98,20 @@ namespace Glasshouse
         public bool AccentTitleBars = true;   // accent colour on title bars and window borders
         public bool QuietSounds = true;       // Windows' system sounds off
         public bool DarkTaskManager = true;   // Task Manager's own dark theme (in light mode the glass leaves its list black with black names)
+        public bool StandardColours = true;   // Windows' standard classic colours (the glass can leave them dark: white-on-white text boxes in browsers)
 
         public Dictionary<string, object> ToJson() => new Dictionary<string, object>
         {
             ["autoHideDock"] = AutoHideDock, ["transparency"] = Transparency, ["hideDesktopIcons"] = HideDesktopIcons,
             ["hideTaskbarExtras"] = HideTaskbarExtras, ["startNoRecent"] = StartNoRecent, ["accentTitleBars"] = AccentTitleBars,
-            ["quietSounds"] = QuietSounds, ["darkTaskManager"] = DarkTaskManager
+            ["quietSounds"] = QuietSounds, ["darkTaskManager"] = DarkTaskManager, ["standardColours"] = StandardColours
         };
         public static Tidy FromJson(Dictionary<string, object> d) => d == null ? new Tidy() : new Tidy
         {
             AutoHideDock = d.Bool("autoHideDock", true), Transparency = d.Bool("transparency", true), HideDesktopIcons = d.Bool("hideDesktopIcons", true),
             HideTaskbarExtras = d.Bool("hideTaskbarExtras", true), StartNoRecent = d.Bool("startNoRecent", true),
-            AccentTitleBars = d.Bool("accentTitleBars", true), QuietSounds = d.Bool("quietSounds", true), DarkTaskManager = d.Bool("darkTaskManager", true)
+            AccentTitleBars = d.Bool("accentTitleBars", true), QuietSounds = d.Bool("quietSounds", true), DarkTaskManager = d.Bool("darkTaskManager", true),
+            StandardColours = d.Bool("standardColours", true)
         };
     }
 
@@ -127,6 +129,8 @@ namespace Glasshouse
         };
         public Tidy Tidy = new Tidy();
         public HashSet<string> Personal = new HashSet<string>();   // personal bits that are ON in this look
+        // "Apps that switch with it": app id -> on (follows Windows) or off (keeps its own setting). See FollowApps.
+        public Dictionary<string, bool> FollowApps = new Dictionary<string, bool>();
 
         public ModSpec Mod(string id) => Mods.FirstOrDefault(m => m.Id == id);
 
@@ -142,6 +146,7 @@ namespace Glasshouse
                 ["macPointers"] = MacPointers,
                 ["apps"] = Apps.ToDictionary(k => k.Key, k => (object)k.Value),
                 ["tidy"] = Tidy.ToJson(),
+                ["followApps"] = FollowApps.ToDictionary(k => k.Key, k => (object)k.Value),
                 ["personal"] = PersonalItem.Known.Where(p => Personal.Contains(p.Id)).Select(p => (object)new Dictionary<string, object>
                     { ["id"] = p.Id, ["label"] = p.Label, ["on"] = Personal.Contains(p.Id) }).ToList(),
                 ["mods"] = Mods.Select(m => (object)m.ToJson()).ToList()
@@ -162,6 +167,8 @@ namespace Glasshouse
             };
             var apps = d.Obj("apps");
             if (apps != null) foreach (var k in apps.Keys.ToList()) l.Apps[k] = apps.Bool(k);
+            var follow = d.Obj("followApps");
+            if (follow != null) foreach (var k in follow.Keys.ToList()) l.FollowApps[k] = follow.Bool(k);
             foreach (var p in d.Arr("personal") ?? new List<object>())
                 if (p is Dictionary<string, object> pd && pd.Bool("on")) l.Personal.Add(pd.Str("id"));
             foreach (var m in d.Arr("mods") ?? new List<object>())

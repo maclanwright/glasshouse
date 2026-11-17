@@ -67,6 +67,7 @@ namespace Glasshouse.Ui
             placeBtn.Content = pb;
             placeBtn.Click += (s, e) => placeEditor.Visibility = placeEditor.Visibility == Visibility.Visible ? Visibility.Collapsed : Visibility.Visible;
             Add(Group(appsRow, winRow, Row("Where you are", placeBtn, "Sets sunrise and sunset. Or pick your own times."), placeEditor));
+            FollowSection();
 
             Add(Caption("Wallpaper"));
             var img = Wallpaper.CurrentImage(look.Wallpaper);
@@ -222,7 +223,8 @@ namespace Glasshouse.Ui
                 Row("Accent colour on title bars", Toggle(t.AccentTitleBars, on => ed.Change("tidy", l => l.Tidy.AccentTitleBars = on))),
                 Row("Transparency effects", Toggle(t.Transparency, on => ed.Change("tidy", l => l.Tidy.Transparency = on)), "The glass needs this on"),
                 Row("Windows sounds off", Toggle(t.QuietSounds, on => ed.Change("tidy", l => l.Tidy.QuietSounds = on)), "Turning it on again: Settings > Sound > More sound settings"),
-                Row("Task Manager always dark", Toggle(t.DarkTaskManager, on => ed.Change("tidy", l => l.Tidy.DarkTaskManager = on)), "In light mode the glass makes its list unreadable")));
+                Row("Task Manager always dark", Toggle(t.DarkTaskManager, on => ed.Change("tidy", l => l.Tidy.DarkTaskManager = on)), "In light mode the glass makes its list unreadable"),
+                Row("Standard colours in web pages and older programs", Toggle(t.StandardColours, on => ed.Change("tidy", l => l.Tidy.StandardColours = on)), "The glass can leave Windows' old colours dark, which turns typed text in browsers white on white")));
             Add(Caption("Small fixes for this computer"));
             Add(Group(PersonalItem.Known.Select(p => (UIElement)Row(p.Label, Toggle(ed.Look.Personal.Contains(p.Id), on =>
             {

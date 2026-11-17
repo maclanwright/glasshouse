@@ -102,6 +102,7 @@ namespace Glasshouse.Ui
             if (areas.Contains("autohide") && look.Tidy.AutoHideDock) { System.Threading.Thread.Sleep(1200); Shell.AutoHide = true; }
             if (areas.Contains("accent")) Glasshouse.Accent.Apply(look.Accent);
             if (areas.Contains("lightdark")) AutoDarkMode.Apply(look.LightDark);
+            if (areas.Contains("follow")) FollowApps.Apply(look.FollowApps);
             if (areas.Contains("wallpaper")) Wallpaper.Apply(look.Wallpaper, look.LightDark);
             if (areas.Contains("pointers")) Pointers.Apply(look.MacPointers);
             if (areas.Contains("tidy") && Shell.ApplyTidy(look.Tidy)) restart = true;
